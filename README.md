@@ -1,4 +1,5 @@
-# Hotel API
+# Hotel Search API
+## A00488636 Anuja Dinuwara Gamage 
 This project implements a RESTful API for managing hotel information using Django and Django REST Framework.
 
 ## Project Structure
@@ -24,13 +25,16 @@ The project contains a Django application called hotelapi that provides endpoint
 
 The following endpoints are available:
 
+### Main Endpoints
 - `GET /hotel_list/`: List all hotels
+- `POST /reservation/`: Create a new reservation
+- `GET /available_hotels/`: Get list of available hotels for specified dates
+
+### Utility Endpoints
 - `POST /hotel_list/`: Create a new hotel
 - `GET /hotel_list/<id>`: Get details for a specific hotel
 - `GET /generics_hotel_list/`: List all hotels (alternative implementation using generic views)
 - `POST /generics_hotel_list/`: Create a new hotel (alternative implementation)
-- `POST /reservation/`: Create a new reservation
-- `GET /available_hotels/`: Get list of available hotels for specified dates
 
 ## Hotel Data Model
 
@@ -56,7 +60,9 @@ Each hotel record contains:
 
 1. Clone the repository:
    ```
-   git clone <repository-url>
+   git clone https://github.com/AnujaSMU/DjangoFinalAssignment.git
+
+https://github.com/AnujaSMU/HotelResAndriod.git
    cd testproj
    ```
 
