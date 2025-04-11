@@ -23,4 +23,6 @@ urlpatterns = [
     path("hotel_list/", views.Hotels_list, name="hotelList"),
     path("hotel_list/<str:id>", views.Hotels_detail, name="hotelDetail"),
     path("generics_hotel_list/", views.get_generics_list.as_view(), name="genericsList"),
+    path("reservation/", views.reservationConfirmation, name="reservationConfirmation"),
+    path("available_hotels/", views.available_hotels, name="availableHotels"),
 ]
