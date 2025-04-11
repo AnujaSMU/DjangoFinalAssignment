@@ -25,4 +25,5 @@ urlpatterns = [
     path("generics_hotel_list/", views.get_generics_list.as_view(), name="genericsList"),
     path("reservation/", views.reservationConfirmation, name="reservationConfirmation"),
     path("available_hotels/", views.available_hotels, name="availableHotels"),
+    path("reservations/", views.reservation_list, name="reservationList"),
 ]

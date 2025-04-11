@@ -5,14 +5,16 @@ from rest_framework import status
 from .models import Hotel, Guest, Reservation
 from .serializers import HotelSerializer, GuestSerializer, ReservationInputSerializer, ReservationResponseSerializer
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import JSONParser
 import uuid
 from django.db.models import Q
 from datetime import datetime
 
 # Create your views here.
-@csrf_exempt
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])  # In production, consider using IsAuthenticated
 def Hotels_list(request):
     if request.method == 'GET':
         hotels = Hotel.objects.all()
@@ -27,7 +29,8 @@ def Hotels_list(request):
             return JsonResponse(serializer.data, status=status.HTTP_201_CREATED)
         return JsonResponse(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-@csrf_exempt
+@api_view(['GET'])
+@permission_classes([AllowAny])  # In production, consider using IsAuthenticated
 def Hotels_detail(request, id):
     try:
         hotel = Hotel.objects.get(id=id)
@@ -41,13 +44,36 @@ def Hotels_detail(request, id):
 class get_generics_list(generics.ListCreateAPIView):
     queryset = Hotel.objects.all()
     serializer_class = HotelSerializer
+    permission_classes = [AllowAny]  # In production, consider using IsAuthenticated
 
-@csrf_exempt
+@api_view(['POST'])
+@permission_classes([AllowAny])  # In production, consider using IsAuthenticated
 def reservationConfirmation(request):
     if request.method == 'POST':
         data = JSONParser().parse(request)
-        input_serializer = ReservationInputSerializer(data=data)
         
+        # Convert date formats if they use slashes
+        if 'checkin' in data and isinstance(data['checkin'], str) and '/' in data['checkin']:
+            try:
+                date_obj = datetime.strptime(data['checkin'], '%m/%d/%Y')
+                data['checkin'] = date_obj.strftime('%Y-%m-%d')
+            except ValueError:
+                return JsonResponse(
+                    {'error': 'Invalid checkin date format. Use MM/DD/YYYY'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+        if 'checkout' in data and isinstance(data['checkout'], str) and '/' in data['checkout']:
+            try:
+                date_obj = datetime.strptime(data['checkout'], '%m/%d/%Y')
+                data['checkout'] = date_obj.strftime('%Y-%m-%d')
+            except ValueError:
+                return JsonResponse(
+                    {'error': 'Invalid checkout date format. Use MM/DD/YYYY'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        input_serializer = ReservationInputSerializer(data=data)
         if input_serializer.is_valid():
             # Create a new reservation
             reservation = Reservation.objects.create(
@@ -72,7 +98,8 @@ def reservationConfirmation(request):
         
     return JsonResponse({'error': 'Only POST method is allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
-@csrf_exempt
+@api_view(['GET'])
+@permission_classes([AllowAny])  # In production, consider using IsAuthenticated
 def available_hotels(request):
     if request.method == 'GET':
         checkin = request.GET.get('checkin', None)
@@ -85,12 +112,24 @@ def available_hotels(request):
             )
         
         try:
-            # Try to parse dates in MM/DD/YYYY format first
-            try:
-                checkout_date = datetime.strptime(checkout, '%m/%d/%Y').date()
-            except ValueError:
-                # Fallback to YYYY-MM-DD format
-                checkout_date = datetime.strptime(checkout, '%Y-%m-%d').date()
+            # Convert checkout date format if it contains slashes
+            if '/' in checkout:
+                try:
+                    checkout_date = datetime.strptime(checkout, '%m/%d/%Y').date()
+                except ValueError:
+                    return JsonResponse(
+                        {'error': 'Invalid checkout date format. Use MM/DD/YYYY'}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            else:
+                # Assume YYYY-MM-DD format
+                try:
+                    checkout_date = datetime.strptime(checkout, '%Y-%m-%d').date()
+                except ValueError:
+                    return JsonResponse(
+                        {'error': 'Invalid checkout date format. Use YYYY-MM-DD'}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
             
             # Find hotels available until checkout date
             available_hotels = Hotel.objects.filter(
@@ -101,11 +140,46 @@ def available_hotels(request):
             serializer = HotelSerializer(available_hotels, many=True)
             return JsonResponse(serializer.data, safe=False)
             
-        except ValueError:
+        except Exception as e:
             return JsonResponse(
-                {'error': 'Invalid date format. Use MM/DD/YYYY or YYYY-MM-DD'}, 
+                {'error': f'Error processing dates: {str(e)}'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
+    
+    return JsonResponse(
+        {'error': 'Only GET method is allowed'}, 
+        status=status.HTTP_405_METHOD_NOT_ALLOWED
+    )
+
+@api_view(['GET'])
+@permission_classes([AllowAny])  # In production, consider using IsAuthenticated
+def reservation_list(request):
+    """
+    Get a list of all reservations
+    """
+    if request.method == 'GET':
+        reservations = Reservation.objects.all().prefetch_related('guests')
+        
+        # Create a custom response with more details than just confirmation numbers
+        result = []
+        for reservation in reservations:
+            guests = [
+                {
+                    'guest_name': guest.guest_name,
+                    'gender': guest.gender
+                } 
+                for guest in reservation.guests.all()
+            ]
+            
+            result.append({
+                'confirmation_number': reservation.confirmation_number,
+                'hotel_name': reservation.hotel_name,
+                'checkin': reservation.checkin,
+                'checkout': reservation.checkout,
+                'guests': guests
+            })
+            
+        return JsonResponse(result, safe=False)
     
     return JsonResponse(
         {'error': 'Only GET method is allowed'}, 
